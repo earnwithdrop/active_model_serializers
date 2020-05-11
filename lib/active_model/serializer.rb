@@ -174,6 +174,8 @@ module ActiveModel
 
     with_options instance_writer: false, instance_reader: false do |serializer|
       serializer.class_attribute :_attributes_data # @api private
+      serializer.class_attribute :_instrumented_attributes
+      serializer.class_attribute :_instrumented_associations
       self._attributes_data ||= {}
       self._instrumented_attributes ||= []
       self._instrumented_associations ||= []
