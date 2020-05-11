@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'ddtrace'
 require 'thread_safe'
 require 'jsonapi/include_directive'
 require 'active_model/serializer/collection_serializer'
@@ -174,6 +175,8 @@ module ActiveModel
     with_options instance_writer: false, instance_reader: false do |serializer|
       serializer.class_attribute :_attributes_data # @api private
       self._attributes_data ||= {}
+      self._instrumented_attributes ||= []
+      self._instrumented_associations ||= []
     end
     with_options instance_writer: false, instance_reader: true do |serializer|
       serializer.class_attribute :_reflections
@@ -225,6 +228,14 @@ module ActiveModel
     def self.attribute(attr, options = {}, &block)
       key = options.fetch(:key, attr)
       _attributes_data[key] = Attribute.new(attr, options, block)
+    end
+
+    def self.instrument_attributes(*attributes)
+      _instrumented_attributes = attributes
+    end
+
+    def self.instrument_associations(*assocs)
+      _instrumented_associations = assocs
     end
 
     # @param [Symbol] name of the association
@@ -335,9 +346,19 @@ module ActiveModel
     def attributes(requested_attrs = nil, reload = false)
       @attributes = nil if reload
       @attributes ||= self.class._attributes_data.each_with_object({}) do |(key, attr), hash|
-        next if attr.excluded?(self)
-        next unless requested_attrs.nil? || requested_attrs.include?(key)
-        hash[key] = attr.value(self)
+        if self.class._instrumented_attributes.include?(attr.name)
+          Datadog.tracer.trace('active_model_serializers.render_attribute') do |span|
+            span.set_tag 'attribute', attr.name
+
+            next if attr.excluded?(self)
+            next unless requested_attrs.nil? || requested_attrs.include?(key)
+            hash[key] = attr.value(self)
+          end
+        else
+          next if attr.excluded?(self)
+          next unless requested_attrs.nil? || requested_attrs.include?(key)
+          hash[key] = attr.value(self)
+        end
       end
     end
 
