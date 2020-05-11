@@ -349,8 +349,9 @@ module ActiveModel
       @attributes = nil if reload
       @attributes ||= self.class._attributes_data.each_with_object({}) do |(key, attr), hash|
         if self.class._instrument_attributes
-          Datadog.tracer.trace('active_model_serializers.render_attribute') do |span|
-            span.set_tag 'attribute', attr.name
+          Datadog.tracer.trace('active_model_serializers.render_attribute', resource: self.class.name) do |span|
+            span.set_tag 'active_model_serializers.attribute', attr.name
+            span.set_tag 'active_model_serializers.serializer', self.class.name
 
             next if attr.excluded?(self)
             next unless requested_attrs.nil? || requested_attrs.include?(key)
@@ -374,8 +375,9 @@ module ActiveModel
       Enumerator.new do |y|
         (self.instance_reflections ||= self.class._reflections.deep_dup).each do |key, reflection|
           if self.class._instrument_associations
-            Datadog.tracer.trace('active_model_serializers.render_assocation') do |span|
-              span.set_tag 'association', reflection.name
+            Datadog.tracer.trace('active_model_serializers.render_assocation', resource: self.class.name) do |span|
+              span.set_tag 'active_model_serializers.association', reflection.name
+              span.set_tag 'active_model_serializers.serializer', self.class.name
 
               next if reflection.excluded?(self)
               next unless include_directive.key?(key)
