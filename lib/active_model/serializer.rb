@@ -233,11 +233,11 @@ module ActiveModel
     end
 
     def self.instrument_attributes(*attributes)
-      _instrumented_attributes = attributes
+      self._instrumented_attributes = attributes
     end
 
     def self.instrument_associations(*assocs)
-      _instrumented_associations = assocs
+      self._instrumented_associations = assocs
     end
 
     # @param [Symbol] name of the association
