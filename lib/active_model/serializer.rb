@@ -174,11 +174,11 @@ module ActiveModel
 
     with_options instance_writer: false, instance_reader: false do |serializer|
       serializer.class_attribute :_attributes_data # @api private
-      serializer.class_attribute :_instrumented_attributes
-      serializer.class_attribute :_instrumented_associations
+      serializer.class_attribute :_instrument_attributes
+      serializer.class_attribute :_instrument_associations
       self._attributes_data ||= {}
-      self._instrumented_attributes ||= []
-      self._instrumented_associations ||= []
+      self._instrument_attributes = false
+      self._instrument_associations = false
     end
     with_options instance_writer: false, instance_reader: true do |serializer|
       serializer.class_attribute :_reflections
@@ -232,12 +232,12 @@ module ActiveModel
       _attributes_data[key] = Attribute.new(attr, options, block)
     end
 
-    def self.instrument_attributes(*attributes)
-      self._instrumented_attributes = attributes
+    def self.instrument_attributes(value=true)
+      self._instrument_attributes = value
     end
 
-    def self.instrument_associations(*assocs)
-      self._instrumented_associations = assocs
+    def self.instrument_associations(value=true)
+      self._instrument_associations = value
     end
 
     # @param [Symbol] name of the association
@@ -348,7 +348,7 @@ module ActiveModel
     def attributes(requested_attrs = nil, reload = false)
       @attributes = nil if reload
       @attributes ||= self.class._attributes_data.each_with_object({}) do |(key, attr), hash|
-        if self.class._instrumented_attributes.include?(attr.name)
+        if self.class._instrument_attributes
           Datadog.tracer.trace('active_model_serializers.render_attribute') do |span|
             span.set_tag 'attribute', attr.name
 
@@ -373,11 +373,23 @@ module ActiveModel
 
       Enumerator.new do |y|
         (self.instance_reflections ||= self.class._reflections.deep_dup).each do |key, reflection|
-          next if reflection.excluded?(self)
-          next unless include_directive.key?(key)
+          if self.class._instrument_associations
+            Datadog.tracer.trace('active_model_serializers.render_assocation') do |span|
+              span.set_tag 'association', reflection.name
 
-          association = reflection.build_association(self, instance_options, include_slice)
-          y.yield association
+              next if reflection.excluded?(self)
+              next unless include_directive.key?(key)
+
+              association = reflection.build_association(self, instance_options, include_slice)
+              y.yield association
+            end
+          else
+            next if reflection.excluded?(self)
+            next unless include_directive.key?(key)
+
+            association = reflection.build_association(self, instance_options, include_slice)
+            y.yield association
+          end
         end
       end
     end
