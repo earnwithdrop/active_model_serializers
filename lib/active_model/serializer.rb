@@ -375,7 +375,7 @@ module ActiveModel
       Enumerator.new do |y|
         (self.instance_reflections ||= self.class._reflections.deep_dup).each do |key, reflection|
           if self.class._instrument_associations
-            Datadog.tracer.trace('active_model_serializers.render_assocation', resource: self.class.name) do |span|
+            Datadog.tracer.trace('active_model_serializers.render_association', resource: self.class.name) do |span|
               span.set_tag 'active_model_serializers.association', reflection.name
               span.set_tag 'active_model_serializers.serializer', self.class.name
 
