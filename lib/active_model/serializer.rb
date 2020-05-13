@@ -192,6 +192,8 @@ module ActiveModel
     def self.inherited(base)
       super
       base._attributes_data = _attributes_data.dup
+      base._instrument_attributes = false
+      base._instrument_associations = false
       base._reflections = _reflections.dup
       base._links = _links.dup
     end
